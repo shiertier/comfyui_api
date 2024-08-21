@@ -1,6 +1,6 @@
 import logging
 import sys
-from .config import DEBUG
+from ..config import DEBUG, ZH_CN
 
 __all__ = ["debugf", "infof", "errorf", "watchdog"]
 
@@ -39,22 +39,22 @@ for handler_name, handler in handlers.items():
     loggers[handler_name].setLevel(levels[handler_name])
     loggers[handler_name].propagate = False
 
-def debugf(format, *args):
+def log_message(level, a, b):
+    msg = b if ZH_CN and b is not None else a
+    if level in loggers:
+        loggers[level].log(level, msg)
+    return msg
+
+def debugf(a, b=None):
     if DEBUG:
-        msg = format % args
-        loggers["DEBUG"].debug(msg)
-        return msg
+        return log_message("DEBUG", a, b)
     return None
 
-def infof(format, *args):
-    msg = format % args
-    loggers["INFO"].info(msg)
-    return msg
+def infof(a, b=None):
+    return log_message("INFO", a, b)
 
-def errorf(format, *args):
-    msg = format % args
-    loggers["ERROR"].error(msg)
-    return msg
+def errorf(a, b=None):
+    return log_message("ERROR", a, b)
 
-def watchdog(msg):
-    loggers["WATCHDOG"].info(msg)
+def watchdog(a, b=None):
+    return log_message("WATCHDOG", a, b)

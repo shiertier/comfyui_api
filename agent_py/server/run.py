@@ -9,7 +9,7 @@ import time
 
 from websocket import WebSocketApp
 from config import CLIENT_ID, TASK_STORE, COMFY_UI_HOST
-from log import debugf, errorf
+from agent_py.utils.log import debugf, errorf
 
 from ..comfyui.api import prompt, progress, upload_image
 from ..store.progress import TProgress, TProgressNode, TProgressNodeImage

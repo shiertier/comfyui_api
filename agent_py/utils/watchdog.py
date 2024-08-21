@@ -1,150 +1,124 @@
-'''
-看门狗WatchDog机制
-用于监控一个外部进程的状态
-如果该进程停止或崩溃，看门狗会自动重启它
-'''
-
 import subprocess
 import threading
 import time
 import signal
 import socket
-from io import TextIOWrapper
-from contextlib import contextmanager
 import os
-from .config import WATCHDOG_INTERVAL_MS
+from ..config import WATCHDOG_INTERVAL_MS, START_HOST
 from .log import debugf, infof, errorf, watchdog
 
 class WatchDog:
-    def __init__(self, port: int, command: list):
+    def __init__(self, host: str, port: int, command: list):
+        self.host = host
         self.port = port
         self.command = command
-        self.stdout_r, self.stdout_w = None, None
-        self.stderr_r, self.stderr_w = None, None
-        self.ctx = None
-        self.cancel = None
-        self.wait_group = threading.Event()
+        self.process = None
         self.has_check_health = False
         self.is_starting = False
-        self.init()
-
-    def init(self):
-        if self.ctx is None:
-            self.ctx, self.cancel = contextmanager(lambda: (yield))()
-
-        if self.stdout_r is None or self.stdout_w is None:
-            self.stdout_r, self.stdout_w = TextIOWrapper(subprocess.PIPE), TextIOWrapper(subprocess.PIPE)
-
-        if self.stderr_r is None or self.stderr_w is None:
-            self.stderr_r, self.stderr_w = TextIOWrapper(subprocess.PIPE), TextIOWrapper(subprocess.PIPE)
+        self.stop_event = threading.Event()
+        self.stdout_r, self.stderr_r = None, None
 
     def check_port(self) -> bool:
+        '''检测端口是否占用'''
         if self.port == 0:
-            errorf("watchdog port is not set")
+            errorf("WatchDog port is not set", "WatchDog 端口未设置")
             return False
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.1)
-            result = s.connect_ex(('localhost', self.port))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.1)
+            result = sock.connect_ex((self.host, self.port))
             if result != 0:
-                debugf("check port error, %s", result)
+                debugf("{} {} is not available: {}".format(self.host, self.port, result), "{} {} 不可用: {}".format(self.host, self.port, result))
                 return False
             return True
 
     def check_health_loop(self):
-        debugf("start checkHealthLoop")
+        # 健康检查
+        debugf("Starting health check loop", "开始健康检查循环")
         if self.has_check_health:
-            debugf("checkHealthLoop has started, skip")
+            debugf("Health check loop already running, skipping", "健康检查循环已经运行，跳过")
             return
 
         self.has_check_health = True
-        self.wait_group.set()
 
-        ticker = threading.Event()
-        while not ticker.wait(WATCHDOG_INTERVAL_MS / 1000):
+        while not self.stop_event.wait(WATCHDOG_INTERVAL_MS / 1000):
             if self.is_starting:
                 continue
 
             if not self.check_port():
-                retry = 5
-                should_restart = True
-                while retry > 0:
-                    debugf("port is not available, waiting...")
-                    retry -= 1
+                debugf("Port {} is not available, trying to restart".format(self.port), "端口 {} 不可用，尝试重启".format(self.port))
+                for _ in range(5):
                     time.sleep(WATCHDOG_INTERVAL_MS / 1000)
                     if self.check_port():
-                        should_restart = False
                         break
-
-                if should_restart:
-                    debugf("port is not available, try to restart")
-                    err = self.start()
-                    if err is not None:
-                        errorf("WatchDog check health failed, and try to restart failed: %s", err)
+                else:
+                    if self.start() is not None:
+                        errorf("Failed to restart process after health check", "健康检查后重启进程失败")
                         self.kill_self()
 
         self.has_check_health = False
-        self.wait_group.clear()
-        debugf("stop checkHealthLoop")
+        debugf("Health check loop stopped", "健康检查循环已停止")
 
     def start(self) -> None:
-        debugf("start watchdog")
-        if not self.command or len(self.command) == 0:
-            return ValueError("command is not set")
+        """启动进程"""
+        debugf("Starting WatchDog", "启动 WatchDog")
+
+        if not self.command:
+            #raise ValueError("Command is not set")
+            return "Command is not set"
 
         if self.is_starting:
-            infof("WatchDog is starting...")
+            infof("WatchDog is already starting...", "WatchDog 已经在启动中...")
             return
 
-        self.init()
-        self.is_starting = True
+        try:
+            self.is_starting = True
+            infof("Command: {}".format(" ".join(self.command)), "命令: {}".format(" ".join(self.command)))
 
-        infof("command: %s", " ".join(self.command))
-        proc = subprocess.Popen(self.command, stdout=self.stdout_w, stderr=self.stderr_w, text=True)
+            self.process = subprocess.Popen(
+                self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            self.stdout_r, self.stderr_r = self.process.stdout, self.process.stderr
 
-        threading.Thread(target=self.read_output_loop, args=(self.stdout_r,)).start()
-        threading.Thread(target=self.read_output_loop, args=(self.stderr_r,)).start()
+            threading.Thread(target=self.read_output_loop, args=(self.stdout_r,)).start()
 
-        infof("WatchDog is starting progress, waiting port available")
+            infof("Process started with PID: {}".format(self.process.pid), "进程已启动, PID: {}".format(self.process.pid))
 
-        while True:
-            time.sleep(WATCHDOG_INTERVAL_MS / 1000)
-            debugf("pid %d, waiting port available...", proc.pid)
+            while not self.check_port():
+                time.sleep(WATCHDOG_INTERVAL_MS / 1000)
+                debugf("PID {}: Waiting for port {}".format(self.process.pid, self.port), "PID {}: 等待端口 {}".format(self.process.pid, self.port))
 
-            if self.check_port():
-                break
+            infof("Port {} is available, starting health check".format(self.port), "端口 {} 可用, 开始健康检查".format(self.port))
 
-        infof("port is available, start checkhealth")
+            if not self.has_check_health:
+                threading.Thread(target=self.check_health_loop).start()
 
-        if not self.has_check_health:
-            threading.Thread(target=self.check_health_loop).start()
+            self.is_starting = False
+            debugf("WatchDog started", "WatchDog 已启动")
+        except Exception as e:
+            errorf("Error starting WatchDog: {}".format(e), "启动 WatchDog 时出错: {}".format(e))
+            return e
 
-        self.is_starting = False
-        debugf("start watchdog finished")
-
-    def read_output_loop(self, r: TextIOWrapper):
-        self.wait_group.wait()
-
-        for line in r:
-            line = line.strip()
-            if line:
-                watchdog(line)
+    def read_output_loop(self, pipe):
+        for line in iter(pipe.readline, ''):
+            if line.strip():
+                watchdog(line.strip())
+        pipe.close()
 
     def stop(self):
-        infof("WatchDog stop")
-        if self.cancel:
-            self.cancel()
+        infof("Stopping WatchDog", "停止 WatchDog")
+        self.stop_event.set()
+        if self.process:
+            self.process.terminate()
 
     def wait_stop(self):
-        self.wait_group.wait()
+        self.stop_event.wait()
 
     def kill_self(self):
         self.stop()
         self.wait_stop()
-        infof("WatchDog kill self")
+        infof("WatchDog terminating", "WatchDog 已终止")
         os.kill(os.getpid(), signal.SIGTERM)
 
 def new_watchdog(port: int, command: list) -> WatchDog:
-    w = WatchDog(port, command)
-    w.init()
-    return w
+    return WatchDog(port, command)

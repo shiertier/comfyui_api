@@ -23,7 +23,7 @@ def main():
     wd = new_watchdog(COMFY_UI_PORT, sys.argv[1:])
     err = wd.start()
     if err is not None:
-        errorf(f"start comfyui failed, due to {err}")
+        errorf(f"start comfyui failed, due to {err}", f"启动 ComfyUI 失败，因为 {err}")
         return
 
     # 再监听当前 agent 的端口

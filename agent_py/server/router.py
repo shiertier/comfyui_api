@@ -1,6 +1,9 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from ..config import COMFY_UI_HOST
+from .progress import progress
+from .proxy import proxy
+from .run import run_comfyui_http, run_comfyui_websocket
 
 def set_cors(request: BaseHTTPRequestHandler):
     request.send_header('Access-Control-Allow-Origin', request.headers.get('Origin'))
@@ -13,45 +16,30 @@ def set_cors(request: BaseHTTPRequestHandler):
         return True
     return False
 
-def run_comfyui(request: BaseHTTPRequestHandler):
-    if set_cors(request):
-        return
-    # 调用 pipeline 的逻辑
-    request.send_response(200)
-    request.send_header('Content-type', 'text/html')
-    request.end_headers()
-    request.wfile.write(b'Run ComfyUI')
-
-def run_comfyui_websocket(request: BaseHTTPRequestHandler):
-    # 调用 pipeline 的逻辑
-    request.send_response(200)
-    request.send_header('Content-type', 'text/html')
-    request.end_headers()
-    request.wfile.write(b'Run ComfyUI Websocket')
-
-def progress(request: BaseHTTPRequestHandler):
-    if set_cors(request):
-        return
-    # 获取进度的逻辑
-    request.send_response(200)
-    request.send_header('Content-type', 'text/html')
-    request.end_headers()
-    request.wfile.write(b'Progress')
-
-def proxy(request: BaseHTTPRequestHandler):
-    # 默认转发给 comfyui 的逻辑
-    request.send_response(200)
-    request.send_header('Content-type', 'text/html')
-    request.end_headers()
-    request.wfile.write(b'Proxy to ComfyUI')
-
 def router(request: BaseHTTPRequestHandler):
-    path = urlparse(request.path).path
-    if path == '/api/run':
-        run_comfyui(request)
-    elif path == '/api/run/ws':
+    # Determine the path and dispatch to the appropriate handler
+    if request.path == "/api/run":
+        set_cors(request)
+        run_comfyui_http(request)
+    elif request.path == "/api/run/ws":
+        # WebSocket handling is typically done differently in Python
+        # Uncomment if CORS is needed for WebSockets
+        # set_cors(request)
         run_comfyui_websocket(request)
-    elif path == '/api/status':
+    elif request.path == "/api/status":
+        set_cors(request)
         progress(request)
-    else:
+    elif request.path.startswith("/comfyui"):
         proxy(request)
+    else:
+        request.send_error(404, "Not Found")
+
+class RequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        router(self)
+
+    def do_POST(self):
+        router(self)
+
+    def do_OPTIONS(self):
+        set_cors(self)

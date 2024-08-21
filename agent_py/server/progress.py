@@ -1,7 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from ..config import TASK_STORE
-from ..log import errorf
+from ..utils.log import errorf
 
 class HTTPError(Exception):
     def __init__(self, status: int, message: str):

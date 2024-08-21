@@ -1,5 +1,5 @@
 import json
-from .._http import HTTPError
+from ..utils.http import HTTPError
 
 class ErrType:
     REQUEST_PARAMS_ERROR = "RequestParamsError"

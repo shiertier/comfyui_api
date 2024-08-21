@@ -1,9 +1,8 @@
 import os
 import uuid
-from .store.store import FSStore
-from .store.progress import Progress
+from store.progress import Progress
+from store.fs import FS
 
-# 常量
 PORT = 9000
 COMFY_UI_PORT = 8188
 COMFY_UI_ROOT = "/root/comfyui"
@@ -18,8 +17,9 @@ TASK_DIR = "/mnt/auto/comfyui/tasks"
 # 变量
 CLIENT_ID = str(uuid.uuid4())
 
-fs_store = FSStore(TASK_DIR)
-TASK_STORE = Progress(fs_store)
+
+# TaskStore 任务状态的存储，可以考虑存储在 OTS、RDS 等产品，这里只实现了文件系统存储
+TASK_STORE = Progress(FS(TASK_DIR))
 
 def is_debug():
     debug_env = os.getenv("DEBUG", "").lower()

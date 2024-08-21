@@ -2,7 +2,7 @@ import json
 import requests
 import websocket
 from uuid import uuid4
-from ..log import debugf, errorf
+from ..utils.log import debugf, errorf
 from ..config import COMFY_UI_HOST
 
 def prompt(client_id: str, prompt: dict) -> str:
