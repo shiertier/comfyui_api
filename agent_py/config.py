@@ -7,8 +7,8 @@ from .store.progress import Progress
 
 # 常量
 PORT = 9000
-COMFY_UI_PORT = 9001
-COMFY_UI_ROOT = "/comfyui"
+COMFY_UI_PORT = 8188
+COMFY_UI_ROOT = "/root/comfyui"
 TASK_DIR = "/mnt/auto/comfyui/tasks"
 WATCHDOG_INTERVAL_MS = 500
 

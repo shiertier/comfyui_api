@@ -19,25 +19,27 @@ def read_to_json(r: BytesIO, target: Any) -> None:
 
     b = r.read()
     try:
-        json.loads(b.decode(), object_hook=lambda d: target.__dict__.update(d))
+        #json.loads(b.decode(), object_hook=lambda d: target.__dict__.update(d))
+        target.__dict__.update(json.loads(b.decode()))
     except json.JSONDecodeError as e:
         raise e
 
-def http_get(url: str, target: Any) -> requests.Response:
-    resp = requests.get(url)
+def http_request(method: str, url: str, body: Optional[Dict[str, Any]] = None, target: Optional[Any] = None) -> requests.Response:
+    if body is not None:
+        body_bytes = json.dumps(body).encode()
+        debugf("%s", body_bytes)
+        resp = requests.request(method, url, data=body_bytes, headers={"Content-Type": "application/json"})
+    else:
+        resp = requests.request(method, url)
+
     if resp.status_code != 200:
         raise HTTPError(resp.status_code, resp.text)
 
     read_to_json(BytesIO(resp.content), target)
     return resp
 
-def http_post(url: str, body: Dict[str, Any], target: Any) -> requests.Response:
-    body_bytes = json.dumps(body).encode()
-    debugf("%s", body_bytes)
+def http_get(url: str, target: Optional[Any] = None) -> requests.Response:
+    return http_request("GET", url, target=target)
 
-    resp = requests.post(url, data=body_bytes, headers={"Content-Type": "application/json"})
-    if resp.status_code != 200:
-        raise HTTPError(resp.status_code, resp.text)
-
-    read_to_json(BytesIO(resp.content), target)
-    return resp
+def http_post(url: str, body: Dict[str, Any], target: Optional[Any] = None) -> requests.Response:
+    return http_request("POST", url, body=body, target=target)
