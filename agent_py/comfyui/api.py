@@ -1,8 +1,6 @@
 import json
-import uuid
 import requests
 import websocket
-from io import BytesIO
 from uuid import uuid4
 from ..log import debugf, errorf
 from ..config import COMFY_UI_HOST
