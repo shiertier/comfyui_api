@@ -1,9 +1,7 @@
 import os
 import uuid
-from pathlib import Path
-
 from .store import FSStore
-from .store.progress import Progress
+from .progress import Progress
 
 # 常量
 PORT = 9000
@@ -20,11 +18,8 @@ TASK_DIR = "/mnt/auto/comfyui/tasks"
 # 变量
 CLIENT_ID = str(uuid.uuid4())
 
-def create_task_store():
-    fs_store = FSStore(TASK_DIR)
-    return Progress(fs_store)
-
-TASK_STORE = create_task_store()
+fs_store = FSStore(TASK_DIR)
+TASK_STORE = Progress(fs_store)
 
 def is_debug():
     debug_env = os.getenv("DEBUG", "").lower()

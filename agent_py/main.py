@@ -1,9 +1,8 @@
-import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from .config import PORT, COMFY_UI_PORT
-from .log import errorf
-from .watch import new_watchdog
+from .utils.log import errorf
+from .utils.watchdog import new_watchdog
 from .server import router
 
 class Handler(BaseHTTPRequestHandler):

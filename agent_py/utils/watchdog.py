@@ -1,14 +1,19 @@
+'''
+看门狗WatchDog机制
+用于监控一个外部进程的状态
+如果该进程停止或崩溃，看门狗会自动重启它
+'''
+
 import subprocess
 import threading
 import time
 import signal
-import sys
 import socket
 from io import TextIOWrapper
 from contextlib import contextmanager
 import os
-from ..config.config import WATCHDOG_INTERVAL_MS
-from ..log.log import debugf, infof, errorf, watchdog
+from .config import WATCHDOG_INTERVAL_MS
+from .log import debugf, infof, errorf, watchdog
 
 class WatchDog:
     def __init__(self, port: int, command: list):
