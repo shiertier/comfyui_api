@@ -2,15 +2,20 @@ import os
 import uuid
 from pathlib import Path
 
-from .store.fs import FSStore
+from .store import FSStore
 from .store.progress import Progress
 
 # 常量
 PORT = 9000
 COMFY_UI_PORT = 8188
 COMFY_UI_ROOT = "/root/comfyui"
-TASK_DIR = "/mnt/auto/comfyui/tasks"
 WATCHDOG_INTERVAL_MS = 500
+LISTEN = False
+LISTEN_HOST = "0.0.0.0"
+START_HOST = "0.0.0.0"
+
+# STORE 常量
+TASK_DIR = "/mnt/auto/comfyui/tasks"
 
 # 变量
 CLIENT_ID = str(uuid.uuid4())
@@ -27,4 +32,7 @@ def is_debug():
 
 DEBUG = is_debug()
 
-COMFY_UI_HOST = f"127.0.0.1:{COMFY_UI_PORT}"
+if LISTEN:
+    COMFY_UI_HOST = f"{LISTEN_HOST}:{COMFY_UI_PORT}"
+else:
+    COMFY_UI_HOST = f"127.0.0.1:{COMFY_UI_PORT}"
